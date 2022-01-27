@@ -1,0 +1,156 @@
+---
+title: "DM manipulation statistique avec R"
+author: "XinChen22105822"
+date: "12/10/2021"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. Installation des packages
+```{r install libraries,  message=FALSE}
+requiredPackages = c('tidyverse', 'languageR', 'Hmisc', 'corrplot', 'broom', 'knitr', 'xtable', 'ggsignif')
+for(p in requiredPackages){
+  if(!require(p,character.only = TRUE)) install.packages(p)
+  library(p,character.only = TRUE)
+}
+```
+
+
+## 2. Iris {datasets}	
+
+```{r iris}
+data("iris")
+iris %>%
+  View()
+help("iris")
+```
+
+## 3.Description statistiques
+Edgar Anderson’s Iris Data est une base de données qui porte sur 50 fleurs de 3 espèces d’iris dont les mesures(en longueur et en largeur) des sépals et des pétales sont données. Le format d’Iris est un dataframe de 150 cellules et de 5 variables(colonnes) “Sepal.Length, Sepal.Width, Petal.Length, Petal.Width, Species”.
+
+Les vaiables 
+```{r description}
+iris %>% 
+  group_by(Species) %>% 
+  summary()
+```
+
+Dataframe
+```{r description_df}
+str(iris)
+```
+
+## 4.Manipuler la base de données 
+
+i.changer la valeur de référence
+```{r manipulation}
+levels(iris$Species)
+iris_df<- iris %>%
+  mutate(Species  = fct_relevel(Species , "versicolor"))
+levels(iris$Species)
+```
+
+ii. selectionner et filtrer les variables 
+```{r selection}
+iris %>%
+  select(Sepal.Length, Sepal.Width, Species) %>%
+  filter(Species == "setosa")
+```
+
+iii.résumés des données (général vs spécifique)
+```{r summary}
+summary(iris)
+iris %>% 
+  group_by(Species) %>%
+  summarise(count = n(),
+            range_Petal.Length = range(Petal.Length),
+            mean_Petal.Length = mean(Petal.Length),
+            sd_Petal.Length = sd(Petal.Length),
+            var_Petal.Length = var(Petal.Length),
+            min_Petal.Length = min(Petal.Length),
+            max_Petal.Length = max(Petal.Length),
+            median_Petal.Length = median(Petal.Length))
+```
+
+## 5.Hypothèse
+A partir de l'observation sur les données, en particulier le résumé statistique de données par groupes d'espèces, on peut formuler l'hypothèse tel que les variations morphologiques des fleurs d'iris de trois espèces peuvent être quantifié, à savoir que les trois espèces peuvent être discriminé avec des méthodes statistiques. (Si on a les mésures sur les pétales d'une fleur d'iris, on peut prédire leurs espèce avec des méthodes discriminatoires)
+
+i.Premièrement pour tester l'hypothèse, on va construire un modèle linéaire à partir d'un variable dépendant(La longueur de pétales) et le variable indépendant(espèces).
+
+```{r linear model}
+
+mdl.lm <- iris %>% 
+  lm( Petal.Length ~ Species, data = .)
+
+kable(summary(mdl.lm)$coef, digits = 3)
+
+hist(residuals(mdl.lm))
+
+```
+
+A partir du modèle linéar obtenu, on peut concluer qu'il y a bien une différence importance de la longueur de pétales entre les éspèces. Cependant, est-ce que cette conclusion peut être généralisé pour la largeur de pétales? 
+
+En fait, on peut facilement visualiser la réponse à cette question avec les plots linéaires.
+
+## 6.La visualisation
+a.Petal.Length vs Petal.Width
+```{r linear plot_pp, echo=FALSE}
+iris %>% 
+  ggplot(aes(x = Petal.Length,
+             y = Petal.Width,
+             colour = Species)) +
+  theme_bw() +
+  geom_point()+
+  geom_smooth(method = "lm")+
+  labs(x = "Petal.Length", y = "Petal.Width", title = "Petal.Length vs Petal.Width", subtitle = "with a trend line") + # add labels
+  theme(text = element_text(size = 15)) + # increase size of plot
+  theme(legend.position = "bottom", legend.title = element_blank())  # remove legend title and change position
+```
+```{r plot_b}
+iris %>% 
+  ggplot(aes(x = Sepal.Length,
+             y = Sepal.Width,
+             colour = Species)) +
+  theme_bw() +
+  geom_point()+
+  geom_smooth(method = "lm")+
+  labs(x = "Sepal.Length", y = "Sepal.Width", title = "Sepal.Length vs Sepal.Width", subtitle = "with a trend line") + # add labels
+  theme(text = element_text(size = 15)) + # increase size of plot
+  theme(legend.position = "bottom", legend.title = element_blank())  # remove legend title and change position
+```
+
+1.Les deux plots(a, b) montre que l'hypothése est prouvé vrai.C'est à dire que si on a les mésures sur les pétales d'une fleur d'iris, on peut prédire leurs espèce avec des méthodes discriminatoires (ses mésures de pétales tombes dans quel groupe d'espèces)
+
+2.à partir de plot a, on voit que la discrimination entre les trois espèces est la plus important lors qu'on prend en compte les mésures de pétals("Length" et "Width")
+
+3.à partir de plot b, on voit que la différence entre les espèces est plutôt flou lors qu'on compare les sépales.
+
+
+## 7. L'Analyse inférentielle 
+```{r inferentiel}
+cor(iris$Petal.Length, iris$Petal.Width, method = "pearson")
+
+cor.test(iris$Petal.Length, iris$Petal.Width)
+
+corr <- 
+  iris %>% 
+  select(where(is.numeric)) %>% 
+  cor()
+
+corrplot(corr, method = 'ellipse', type = 'upper')
+
+```
+
+A partir de l'anayse inférentielle, on observe que la corrélation coefficiente est à 0.949 et la valeur p est bien "< 2.2e-16". C'est à dire qu'il exist bien une corrélation importance entre les deux valeurs("Petal.Length" et "Petal.Width").
+
+
+## 8.Conclusion:
+La base de données "iris" a présenté un modèle statistique pour differencier les espèces d'iris. Si on a les mésures sur les pétales(et les sepals?)d'une fleur d'iris, on peut prédire leurs espèce avec des méthodes discriminatoires. 
+
